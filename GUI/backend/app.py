@@ -29,7 +29,7 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="stati
 # Now exposed as endpoint arguments so the GUI can control them.
 # ==============================
 
-DEFAULT_MIN_COMPONENT_AREA = 200
+DEFAULT_MIN_COMPONENT_AREA = 100
 DEFAULT_DIGIT_SIZE         = (28, 28)
 DEFAULT_USE_ADAPTIVE       = False
 

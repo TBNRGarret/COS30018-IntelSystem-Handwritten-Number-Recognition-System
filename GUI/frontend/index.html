@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HNRS — Handwritten Number Recognition System</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">HN</div>
+    <span class="logo-text"><span>HNRS</span> — Recognition System</span>
+  </div>
+  <nav>
+    <button class="active" onclick="showNav(this, 'page-input')">Input</button>
+    <button onclick="showNav(this, 'page-preprocess')">Preprocess</button>
+    <button onclick="showNav(this, 'page-segment')">Segment</button>
+    <button onclick="showNav(this, 'page-model')">Model</button>
+    <button onclick="showNav(this, 'page-results')">Results</button>
+    <button onclick="showNav(this, 'page-eval')">Evaluate</button>
+  </nav>
+  <div class="header-status">
+    <div class="status-dot"></div>
+    <span id="header-status-text">Ready</span>
+  </div>
+</header>
+
+<div class="app-body">
+
+<!-- ══ SIDEBAR ══ -->
+<aside>
+  <div class="sidebar-section">
+    <div class="sidebar-label">Pipeline Status</div>
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-circle done" id="ps-input">🖼️</div>
+        <div class="pipe-label">Input</div>
+      </div>
+      <div class="pipe-arrow done" id="pa-1"></div>
+      <div class="pipe-step">
+        <div class="pipe-circle pending" id="ps-pre">⚗️</div>
+        <div class="pipe-label">Preproc</div>
+      </div>
+      <div class="pipe-arrow pending" id="pa-2"></div>
+      <div class="pipe-step">
+        <div class="pipe-circle pending" id="ps-seg">✂️</div>
+        <div class="pipe-label">Segment</div>
+      </div>
+      <div class="pipe-arrow pending" id="pa-3"></div>
+      <div class="pipe-step">
+        <div class="pipe-circle pending" id="ps-ml">🧠</div>
+        <div class="pipe-label">ML</div>
+      </div>
+      <div class="pipe-arrow pending" id="pa-4"></div>
+      <div class="pipe-step">
+        <div class="pipe-circle pending" id="ps-out">📊</div>
+        <div class="pipe-label">Output</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Quick Actions</div>
+    <div class="panel-group">
+      <button class="panel-btn active" onclick="showNav(document.querySelector('nav .active'), 'page-input'); highlightPB(this)">
+        <div class="panel-icon">🖼️</div>
+        <div class="panel-meta">
+          <div class="panel-title">Load Image</div>
+          <div class="panel-sub">Upload or draw</div>
+        </div>
+      </button>
+      <button class="panel-btn" onclick="runFullPipeline()">
+        <div class="panel-icon">▶</div>
+        <div class="panel-meta">
+          <div class="panel-title">Run Pipeline</div>
+          <div class="panel-sub">All stages</div>
+        </div>
+        <span class="badge badge-purple">Auto</span>
+      </button>
+      <button class="panel-btn" onclick="resetAll()">
+        <div class="panel-icon">↺</div>
+        <div class="panel-meta">
+          <div class="panel-title">Reset</div>
+          <div class="panel-sub">Clear all state</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Active Model</div>
+    <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
+      <div style="font-family: var(--font-head); font-size: 14px; font-weight: 700; margin-bottom: 4px;" id="sidebar-model-name">CNN (LeNet-5)</div>
+      <div style="font-size: 11px; color: var(--muted); margin-bottom: 10px;" id="sidebar-model-desc">Convolutional network, 5 layers</div>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="sidebar-model-tags">
+        <span class="badge badge-green">Trained</span>
+        <span class="badge badge-purple">99.1% acc</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-section" style="flex:1;">
+    <div class="sidebar-label">System Log</div>
+    <div class="log-area" id="sys-log">
+      <div class="log-line info">[HNRS] System initialised</div>
+      <div class="log-line ok">[INFO] MNIST dataset available</div>
+      <div class="log-line">[INFO] Awaiting image input…</div>
+    </div>
+  </div>
+</aside>
+
+<!-- ══ MAIN ══ -->
+<main>
+
+  <!-- ─ PAGE: INPUT ─ -->
+  <div class="page active" id="page-input">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Image Input</div>
+        <div class="page-desc">Provide an image of a handwritten number via upload, draw, or compose from digit folder.</div>
+      </div>
+      <button class="btn btn-primary" onclick="proceedToPreprocess()">Continue →</button>
+    </div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="switchTab(this, 'tab-upload')">Upload File</button>
+      <button class="tab-btn" onclick="switchTab(this, 'tab-draw')">Draw</button>
+      <button class="tab-btn" onclick="switchTab(this, 'tab-compose')">Compose from Folder</button>
+    </div>
+
+    <div class="tab-pane active" id="tab-upload">
+      <div class="grid-2" style="gap: 20px;">
+        <div>
+          <div class="drop-zone" id="drop-zone" ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
+            <input type="file" accept="image/*" onchange="handleFileInput(event)" />
+            <div class="drop-icon">📂</div>
+            <div class="drop-title">Drop image here</div>
+            <div class="drop-sub">PNG, JPG, BMP supported<br/>or click to browse</div>
+          </div>
+        </div>
+        <div>
+          <label class="field-label" style="margin-bottom:10px;">Preview</label>
+          <div class="preview-box" id="upload-preview">
+            <div class="preview-empty">No image loaded yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane" id="tab-draw">
+      <div class="grid-2" style="gap:20px; align-items: start;">
+        <div>
+          <label class="field-label" style="margin-bottom:10px;">Draw on Canvas</label>
+          <canvas id="draw-canvas" width="280" height="280"></canvas>
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <button class="btn btn-secondary" onclick="clearCanvas()" style="flex:1;">Clear</button>
+            <button class="btn btn-primary" onclick="useCanvasImage()" style="flex:1;">Use Drawing</button>
+          </div>
+        </div>
+        <div>
+          <div class="field-group">
+            <label class="field-label">Brush size</label>
+            <div class="range-row">
+              <input type="range" min="5" max="30" value="14" oninput="setBrush(this.value)">
+              <span class="range-val" id="brush-val">14</span>
+            </div>
+          </div>
+          <div style="margin-top:16px; color: var(--muted); font-size:12px; line-height:1.8;">
+            ✏️ Draw a handwritten number (can be multiple digits).<br/>The canvas will be sent through the full recognition pipeline.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane" id="tab-compose">
+      <div class="stub-notice" style="margin-bottom:16px;">
+        <span class="stub-icon">⚙️</span>
+        Stub — wire to: load digit PNGs from a folder, concatenate horizontally into one composite image.
+      </div>
+      <div class="grid-2" style="gap:16px;">
+        <div class="field-group">
+          <label class="field-label">Digit images folder path</label>
+          <input type="text" placeholder="/path/to/digits/" id="folder-path" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Sort order</label>
+          <select>
+            <option>Alphabetical (filename)</option>
+            <option>Natural number order</option>
+            <option>Custom sequence</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Spacing between digits (px)</label>
+          <div class="range-row">
+            <input type="range" min="0" max="30" value="8" oninput="this.nextElementSibling.textContent=this.value">
+            <span class="range-val">8</span>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Background colour</label>
+          <select>
+            <option>White</option>
+            <option>Black</option>
+            <option>Auto-detect</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="log('Compose from folder: stub — implement folder reader + image compositor')">Compose Image</button>
+    </div>
+  </div>
+
+  <!-- ─ PAGE: PREPROCESS ─ -->
+  <div class="page" id="page-preprocess">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Image Preprocessing</div>
+        <div class="page-desc">Task 1 — Resize, grayscale, normalise, and optionally binarize the input image.</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-secondary" onclick="previewPreprocess()">Preview</button>
+        <button class="btn btn-primary" onclick="applyPreprocess()">Apply →</button>
+      </div>
+    </div>
+
+    <div class="stub-notice">
+      <span class="stub-icon">⚙️</span>
+      Stub — wire preprocessing ops to OpenCV / PIL backend (Python). Each toggle calls the relevant function.
+    </div>
+
+    <div class="grid-2" style="gap: 20px; margin-top: 8px;">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Preprocessing Techniques</div>
+
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Grayscale conversion</div>
+            <div class="toggle-sub">RGB → single channel</div>
+          </div>
+          <div class="toggle on" id="tgl-gray" onclick="toggleEl(this, 'gray')"></div>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Gaussian blur</div>
+            <div class="toggle-sub">Noise reduction before threshold</div>
+          </div>
+          <div class="toggle" id="tgl-blur" onclick="toggleEl(this, 'blur')"></div>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Binarization (Otsu threshold)</div>
+            <div class="toggle-sub">Global adaptive thresholding</div>
+          </div>
+          <div class="toggle on" id="tgl-bin" onclick="toggleEl(this, 'binarize')"></div>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Adaptive thresholding</div>
+            <div class="toggle-sub">Local neighbourhood threshold</div>
+          </div>
+          <div class="toggle" id="tgl-adapt" onclick="toggleEl(this, 'adaptive')"></div>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Morphological dilation</div>
+            <div class="toggle-sub">Fill gaps in strokes</div>
+          </div>
+          <div class="toggle" id="tgl-morph" onclick="toggleEl(this, 'morph')"></div>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Normalise pixel values [0–1]</div>
+            <div class="toggle-sub">Scale for ML model input</div>
+          </div>
+          <div class="toggle on" id="tgl-norm" onclick="toggleEl(this, 'normalize')"></div>
+        </div>
+
+        <div style="margin-top:16px;">
+          <label class="field-label">Target resize (px)</label>
+          <div class="grid-2" style="gap:8px;">
+            <input type="number" value="28" min="14" max="512" placeholder="Width" />
+            <input type="number" value="28" min="14" max="512" placeholder="Height" />
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <label class="field-label">Blur kernel size</label>
+          <div class="range-row">
+            <input type="range" min="1" max="9" step="2" value="3" oninput="this.nextElementSibling.textContent=this.value+'×'+this.value">
+            <span class="range-val">3×3</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--muted)"></span>Original</div>
+          <div class="preview-box" style="min-height:140px;" id="pre-orig">
+            <div class="preview-empty">Load an image first</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot"></span>After Preprocessing</div>
+          <div class="preview-box" style="min-height:140px;" id="pre-result">
+            <div class="preview-empty">Run preview to see output</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Technique Comparison</div>
+      <div class="chart-ph">
+        <div style="font-size:20px;">📈</div>
+        <div>Stub — render comparison bar chart of preprocessing methods vs. model accuracy</div>
+        <div style="color: var(--accent);">wire to: matplotlib / Chart.js results from experiments</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─ PAGE: SEGMENT ─ -->
+  <div class="page" id="page-segment">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Image Segmentation</div>
+        <div class="page-desc">Task 2 — Locate and isolate individual digits within the preprocessed image.</div>
+      </div>
+      <button class="btn btn-primary" onclick="runSegmentation()">Run Segmentation →</button>
+    </div>
+
+    <div class="stub-notice">
+      <span class="stub-icon">⚙️</span>
+      Stub — implement contour detection (OpenCV findContours), connected component labeling, or projection profiles.
+    </div>
+
+    <div class="grid-2" style="gap:20px;">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Segmentation Method</div>
+        <div class="field-group">
+          <label class="field-label">Algorithm</label>
+          <select id="seg-algo" onchange="updateSegDesc()">
+            <option>Connected Component Labeling</option>
+            <option>Contour Detection (OpenCV)</option>
+            <option>Vertical Projection Profile</option>
+            <option>Sliding Window</option>
+            <option>MSER (Maximally Stable Extremal Regions)</option>
+          </select>
+        </div>
+        <div id="seg-desc" style="font-size: 12px; color: var(--muted); line-height:1.7; background: var(--surface2); border-radius: 6px; padding: 10px; margin-top: 8px;">
+          Finds groups of connected foreground pixels and draws bounding boxes. Robust for clearly separated digits.
+        </div>
+
+        <div style="margin-top: 16px;">
+          <label class="field-label">Min bounding box size (px)</label>
+          <div class="range-row">
+            <input type="range" min="5" max="60" value="15" oninput="this.nextElementSibling.textContent=this.value">
+            <span class="range-val">15</span>
+          </div>
+        </div>
+        <div>
+          <label class="field-label">Padding around digit (px)</label>
+          <div class="range-row">
+            <input type="range" min="0" max="20" value="4" oninput="this.nextElementSibling.textContent=this.value">
+            <span class="range-val">4</span>
+          </div>
+        </div>
+
+        <div class="toggle-row" style="margin-top:12px;">
+          <div><div class="toggle-label">Show bounding boxes overlay</div></div>
+          <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Merge overlapping boxes</div></div>
+          <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Segmented Digits Preview</div>
+        <div class="preview-box" style="min-height:160px;" id="seg-preview">
+          <div class="preview-empty">Run segmentation to see bounding boxes</div>
+        </div>
+        <div style="margin-top:14px;">
+          <label class="field-label">Detected Segments</label>
+          <div class="segments" id="seg-results">
+            <!-- Demo stubs -->
+            <div class="seg-box"><div style="width:36px;height:36px;background:var(--surface);border-radius:4px;"></div><div class="seg-label">?</div><div class="seg-conf">–</div></div>
+            <div class="seg-box"><div style="width:36px;height:36px;background:var(--surface);border-radius:4px;"></div><div class="seg-label">?</div><div class="seg-conf">–</div></div>
+            <div class="seg-box"><div style="width:36px;height:36px;background:var(--surface);border-radius:4px;"></div><div class="seg-label">?</div><div class="seg-conf">–</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─ PAGE: MODEL ─ -->
+  <div class="page" id="page-model">
+    <div class="page-header">
+      <div>
+        <div class="page-title">ML Model</div>
+        <div class="page-desc">Task 3 — Select, configure, and train a machine learning model on MNIST.</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-secondary" onclick="log('Load model weights — stub: implement torch.load / keras model.load_weights')">Load Weights</button>
+        <button class="btn btn-primary" onclick="startTraining()">Train Model</button>
+      </div>
+    </div>
+
+    <div class="stub-notice">
+      <span class="stub-icon">⚙️</span>
+      Stub — each model card maps to a class in models.py. Training calls the backend API/socket.
+    </div>
+
+    <label class="field-label" style="margin-bottom:12px;">Choose Architecture</label>
+    <div class="grid-3" style="gap:12px; margin-bottom:20px;">
+
+      <div class="model-card selected" onclick="selectModel(this,'CNN (LeNet-5)','5-layer convolutional network, sota MNIST baseline','PyTorch','~99.1% acc','Fast train')">
+        <div class="model-name">CNN · LeNet-5</div>
+        <div class="model-desc">Classic 5-layer conv net. MNIST benchmark model. Two conv layers + pooling + fully connected.</div>
+        <div class="model-tags">
+          <span class="tag">PyTorch</span><span class="tag">Conv</span><span class="tag">~99.1%</span>
+        </div>
+      </div>
+
+      <div class="model-card" onclick="selectModel(this,'MLP (Fully Connected)','3-layer dense network, simple baseline','Keras','~98.0% acc','Very fast')">
+        <div class="model-name">MLP · Fully Connected</div>
+        <div class="model-desc">Simple 3-layer dense network. Good baseline — fast to train, interpretable weights.</div>
+        <div class="model-tags">
+          <span class="tag">Keras</span><span class="tag">Dense</span><span class="tag">~98.0%</span>
+        </div>
+      </div>
+
+      <div class="model-card" onclick="selectModel(this,'SVM (HOG features)','Support Vector Machine + HOG descriptors','sklearn','~98.5% acc','No GPU needed')">
+        <div class="model-name">SVM · HOG Features</div>
+        <div class="model-desc">Support Vector Machine with Histogram of Oriented Gradients. Classical ML baseline, no GPU.</div>
+        <div class="model-tags">
+          <span class="tag">sklearn</span><span class="tag">SVM</span><span class="tag">~98.5%</span>
+        </div>
+      </div>
+
+      <div class="model-card" onclick="selectModel(this,'ResNet-18 (Transfer)','Pretrained ResNet adapted for MNIST','PyTorch','~99.4% acc','GPU recommended')">
+        <div class="model-name">ResNet-18 · Transfer</div>
+        <div class="model-desc">Pretrained ResNet adapted for grayscale MNIST. Highest accuracy, slowest training.</div>
+        <div class="model-tags">
+          <span class="tag">PyTorch</span><span class="tag">ResNet</span><span class="tag">~99.4%</span>
+        </div>
+      </div>
+
+      <div class="model-card" onclick="selectModel(this,'Random Forest','Ensemble of decision trees on raw pixels','sklearn','~97.0% acc','CPU only')">
+        <div class="model-name">Random Forest</div>
+        <div class="model-desc">Ensemble of decision trees on raw/PCA pixels. Low resource requirement, useful comparison.</div>
+        <div class="model-tags">
+          <span class="tag">sklearn</span><span class="tag">Ensemble</span><span class="tag">~97.0%</span>
+        </div>
+      </div>
+
+      <div class="model-card" onclick="selectModel(this,'Custom CNN','Your own model architecture','PyTorch','TBD','Custom')">
+        <div class="model-name">Custom CNN +</div>
+        <div class="model-desc">Define your own architecture — add layers, change activation functions, adjust kernel sizes.</div>
+        <div class="model-tags">
+          <span class="tag">PyTorch</span><span class="tag">Custom</span><span class="tag">TBD</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="gap:20px;">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Hyperparameters</div>
+        <div class="field-group">
+          <label class="field-label">Learning rate</label>
+          <div class="range-row">
+            <input type="range" min="-5" max="-1" step="0.5" value="-3" oninput="document.getElementById('lr-val').textContent='1e'+this.value">
+            <span class="range-val" id="lr-val">1e-3</span>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Batch size</label>
+          <select id="batch-size">
+            <option>32</option><option selected>64</option><option>128</option><option>256</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Epochs</label>
+          <div class="range-row">
+            <input type="range" min="1" max="50" value="10" oninput="document.getElementById('epoch-val').textContent=this.value">
+            <span class="range-val" id="epoch-val">10</span>
+          </div>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Optimizer</label>
+          <select>
+            <option>Adam</option><option>SGD with momentum</option><option>RMSProp</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Dropout rate</label>
+          <div class="range-row">
+            <input type="range" min="0" max="80" value="25" oninput="document.getElementById('drop-val').textContent=this.value+'%'">
+            <span class="range-val" id="drop-val">25%</span>
+          </div>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Data augmentation</div><div class="toggle-sub">Random rotation, shifts</div></div>
+          <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="toggle-row">
+          <div><div class="toggle-label">Early stopping</div><div class="toggle-sub">Patience = 3 epochs</div></div>
+          <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Training Progress</div>
+        <div id="train-status" style="font-size:12px; color:var(--muted); margin-bottom:12px; font-family: var(--font-mono);">
+          Not started
+        </div>
+        <div style="margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-bottom:4px;">
+            <span>Epoch progress</span><span id="epoch-progress-label">0/10</span>
+          </div>
+          <div class="epoch-bar-wrap"><div class="epoch-bar" id="epoch-bar" style="width:0%"></div></div>
+        </div>
+        <div class="train-grid">
+          <div class="metric"><div class="metric-val" id="m-acc">—</div><div class="metric-label">Val Accuracy</div></div>
+          <div class="metric"><div class="metric-val" id="m-loss">—</div><div class="metric-label">Val Loss</div></div>
+          <div class="metric"><div class="metric-val" id="m-time">—</div><div class="metric-label">Elapsed</div></div>
+          <div class="metric"><div class="metric-val" id="m-eta">—</div><div class="metric-label">ETA</div></div>
+        </div>
+        <div style="margin-top:16px;">
+          <label class="field-label">Loss / Accuracy Curve</label>
+          <div class="chart-ph" style="height:120px;">
+            <div style="font-size:16px;">📉</div>
+            <div>Stub — render live training curves via Chart.js or matplotlib</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─ PAGE: RESULTS ─ -->
+  <div class="page" id="page-results">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Recognition Results</div>
+        <div class="page-desc">Task 4 — Final output of the HNRS pipeline for the loaded image.</div>
+      </div>
+      <button class="btn btn-success" onclick="runRecognition()">▶ Recognise</button>
+    </div>
+
+    <div class="stub-notice">
+      <span class="stub-icon">⚙️</span>
+      Stub — calls model.predict() on each segmented digit tensor, assembles final number string.
+    </div>
+
+    <div class="grid-2" style="gap:20px;">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Recognised Number</div>
+        <div class="result-big" id="result-number">—</div>
+        <div style="font-size:11px; color:var(--muted); text-align:center; margin-top:-8px; font-family:var(--font-mono);" id="result-meta">Run recognition to see output</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Per-digit Confidence</div>
+        <div id="conf-bars">
+          <div style="color:var(--muted); font-size:12px; text-align:center; padding:20px 0;">Run recognition to populate</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Digit Breakdown</div>
+      <div class="segments" id="result-segments" style="justify-content: flex-start; gap: 10px; min-height: 60px;">
+        <div style="color:var(--muted); font-size:12px;">No segments yet — run the pipeline first.</div>
+      </div>
+    </div>
+
+    <div class="grid-3" style="gap:12px;">
+      <div class="metric"><div class="metric-val" id="r-digits">—</div><div class="metric-label">Digits Found</div></div>
+      <div class="metric"><div class="metric-val" id="r-avgconf">—</div><div class="metric-label">Avg Confidence</div></div>
+      <div class="metric"><div class="metric-val" id="r-time">—</div><div class="metric-label">Inference (ms)</div></div>
+    </div>
+  </div>
+
+  <!-- ─ PAGE: EVAL ─ -->
+  <div class="page" id="page-eval">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Evaluation &amp; Testing</div>
+        <div class="page-desc">Task 4 — Comprehensive benchmarking of models on MNIST test set and multi-digit images.</div>
+      </div>
+      <button class="btn btn-primary" onclick="runEvaluation()">Run Full Evaluation</button>
+    </div>
+
+    <div class="stub-notice">
+      <span class="stub-icon">⚙️</span>
+      Stub — implement: MNIST test set loop, confusion matrix, per-class metrics, multi-digit accuracy test.
+    </div>
+
+    <div class="grid-4">
+      <div class="metric"><div class="metric-val" id="ev-acc">—</div><div class="metric-label">Test Accuracy</div></div>
+      <div class="metric"><div class="metric-val" id="ev-prec">—</div><div class="metric-label">Precision</div></div>
+      <div class="metric"><div class="metric-val" id="ev-rec">—</div><div class="metric-label">Recall</div></div>
+      <div class="metric"><div class="metric-val" id="ev-f1">—</div><div class="metric-label">F1 Score</div></div>
+    </div>
+
+    <div class="grid-2" style="gap:20px;">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Confusion Matrix (10×10)</div>
+        <div class="confusion-grid" id="conf-matrix">
+          <!-- generated by JS -->
+        </div>
+        <div style="margin-top:8px; font-size:11px; color:var(--muted); font-family:var(--font-mono);">Rows: true label · Cols: predicted label</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Per-class Accuracy</div>
+        <div id="per-class-bars">
+          <div class="chart-ph" style="height:220px;">
+            <div style="font-size:16px;">📊</div>
+            <div>Stub — per-digit (0–9) accuracy bar chart</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Model Comparison Table</div>
+      <div class="stub-notice" style="margin-bottom:12px;">
+        <span class="stub-icon">⚙️</span>
+        Stub — populate from experiment results JSON after training each model.
+      </div>
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="text-align:left; padding:8px 4px; color:var(--muted); font-weight:500; font-family:var(--font-mono); font-size:11px; letter-spacing:0.5px;">Model</th>
+            <th style="text-align:right; padding:8px 4px; color:var(--muted); font-weight:500; font-family:var(--font-mono); font-size:11px;">Test Acc</th>
+            <th style="text-align:right; padding:8px 4px; color:var(--muted); font-weight:500; font-family:var(--font-mono); font-size:11px;">F1</th>
+            <th style="text-align:right; padding:8px 4px; color:var(--muted); font-weight:500; font-family:var(--font-mono); font-size:11px;">Infer (ms)</th>
+            <th style="text-align:right; padding:8px 4px; color:var(--muted); font-weight:500; font-family:var(--font-mono); font-size:11px;">Params</th>
+            <th style="padding:8px 4px;"></th>
+          </tr>
+        </thead>
+        <tbody id="eval-table">
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 4px; font-weight:500;">CNN (LeNet-5)</td>
+            <td style="text-align:right; padding:10px 4px; color:var(--success); font-family:var(--font-mono);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">62K</td>
+            <td style="padding:10px 4px;"><span class="badge badge-purple">Selected</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 4px; font-weight:500;">MLP</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">235K</td>
+            <td></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 4px; font-weight:500;">SVM (HOG)</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="padding:10px 4px; font-weight:500;">Random Forest</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td style="text-align:right; padding:10px 4px; font-family:var(--font-mono); color:var(--muted);">—</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<!-- ══ RIGHT PANEL ══ -->
+<div class="right-panel">
+  <div>
+    <div class="rp-title">Current Image</div>
+    <div class="preview-box" style="min-height:140px;" id="rp-preview">
+      <div class="preview-empty" style="font-size:11px;">No image</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="rp-title">Image Info</div>
+    <table style="width:100%; font-size:12px; border-collapse:collapse;">
+      <tr><td style="color:var(--muted); padding:4px 0;">Size</td><td style="text-align:right; font-family:var(--font-mono); color:var(--text);" id="img-size">—</td></tr>
+      <tr><td style="color:var(--muted); padding:4px 0;">Mode</td><td style="text-align:right; font-family:var(--font-mono); color:var(--text);" id="img-mode">—</td></tr>
+      <tr><td style="color:var(--muted); padding:4px 0;">Source</td><td style="text-align:right; font-family:var(--font-mono); color:var(--text);" id="img-source">—</td></tr>
+    </table>
+  </div>
+
+  <div class="divider"></div>
+
+  <div>
+    <div class="rp-title">Dataset</div>
+    <div class="field-group">
+      <label class="field-label">Source</label>
+      <select>
+        <option>MNIST (standard)</option>
+        <option>MNIST (rotated)</option>
+        <option>Custom dataset</option>
+      </select>
+    </div>
+    <div style="font-size:11px; color:var(--muted); line-height:1.7; margin-top:6px;">
+      60,000 training images<br/>10,000 test images<br/>28×28 pixels, grayscale
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div>
+    <div class="rp-title">Extension Options</div>
+    <div class="panel-group">
+      <button class="panel-btn" onclick="log('[EXT] Option 1: handwritten text recognition — stub')">
+        <div class="panel-icon" style="font-size:12px;">Aa</div>
+        <div class="panel-meta">
+          <div class="panel-title">Text Recognition</div>
+          <div class="panel-sub">Ext. Option 1</div>
+        </div>
+        <span class="badge badge-warn">Stub</span>
+      </button>
+      <button class="panel-btn" onclick="log('[EXT] Option 2: arithmetic expression evaluator — stub')">
+        <div class="panel-icon" style="font-size:12px;">±×</div>
+        <div class="panel-meta">
+          <div class="panel-title">Math Expression</div>
+          <div class="panel-sub">Ext. Option 2</div>
+        </div>
+        <span class="badge badge-warn">Stub</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+</div><!-- end app-body -->
+
+<script>
+// ══ NAVIGATION ══
+function showNav(btn, pageId) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const pg = document.getElementById(pageId);
+  if (pg) pg.classList.add('active');
+}
+
+function highlightPB(el) {
+  document.querySelectorAll('.panel-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function switchTab(btn, tabId) {
+  const row = btn.parentElement;
+  row.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const parent = row.parentElement;
+  parent.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+}
+
+// ══ LOG ══
+function log(msg, type='') {
+  const area = document.getElementById('sys-log');
+  const line = document.createElement('div');
+  const ts = new Date().toLocaleTimeString('en', {hour12:false});
+  line.className = 'log-line ' + type;
+  line.textContent = `[${ts}] ${msg}`;
+  area.appendChild(line);
+  area.scrollTop = area.scrollHeight;
+  document.getElementById('header-status-text').textContent = msg.slice(0,30) + (msg.length>30?'…':'');
+}
+
+// ══ CURRENT FILE TRACKING ══
+// Stores the raw File object so any endpoint can send it
+let currentFile = null;
+
+// ══ CANVAS DRAW ══
+const canvas = document.getElementById('draw-canvas');
+const ctx = canvas.getContext('2d');
+ctx.fillStyle = '#ffffff';
+ctx.fillRect(0,0,280,280);
+ctx.strokeStyle = '#000000';
+ctx.lineWidth = 14;
+ctx.lineCap = 'round';
+ctx.lineJoin = 'round';
+
+let drawing = false, brushSize = 14;
+
+canvas.addEventListener('pointerdown', e => {
+  drawing = true;
+  ctx.beginPath();
+  const r = canvas.getBoundingClientRect();
+  ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
+});
+canvas.addEventListener('pointermove', e => {
+  if (!drawing) return;
+  const r = canvas.getBoundingClientRect();
+  ctx.lineWidth = brushSize;
+  ctx.lineTo(e.clientX - r.left, e.clientY - r.top);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
+});
+canvas.addEventListener('pointerup', () => { drawing = false; ctx.beginPath(); });
+canvas.addEventListener('pointerleave', () => { drawing = false; ctx.beginPath(); });
+
+function clearCanvas() {
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,280,280);
+  log('Canvas cleared');
+}
+
+function setBrush(v) {
+  brushSize = parseInt(v);
+  document.getElementById('brush-val').textContent = v;
+}
+
+function useCanvasImage() {
+  canvas.toBlob(blob => {
+    currentFile = new File([blob], 'canvas_drawing.png', { type: 'image/png' });
+    const url = URL.createObjectURL(blob);
+    setPreviewImage(url, 'Canvas drawing', '280×280', 'RGB');
+    log('Canvas drawing set as input image', 'ok');
+    setPipelineStep('ps-input', 'done');
+  }, 'image/png');
+}
+
+// ══ FILE INPUT ══
+function handleFileInput(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  currentFile = file;   // ← store for API calls
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      setPreviewImage(ev.target.result, file.name, img.width+'×'+img.height, 'RGB');
+    };
+    img.src = ev.target.result;
+    log('Image loaded: ' + file.name, 'ok');
+    setPipelineStep('ps-input', 'done');
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('over'); }
+function handleDragLeave(e) { document.getElementById('drop-zone').classList.remove('over'); }
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    const fakeEvt = { target: { files: [file] } };
+    handleFileInput(fakeEvt);
+  }
+}
+
+function setPreviewImage(src, name, size, mode) {
+  ['upload-preview','rp-preview','pre-orig'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = `<img src="${src}" alt="preview" />`;
+  });
+  document.getElementById('img-size').textContent = size;
+  document.getElementById('img-mode').textContent = mode;
+  document.getElementById('img-source').textContent = name.length>14 ? name.slice(0,12)+'…' : name;
+}
+
+// ══ PIPELINE STATE ══
+const steps = ['ps-input','ps-pre','ps-seg','ps-ml','ps-out'];
+const arrows = ['pa-1','pa-2','pa-3','pa-4'];
+
+function setPipelineStep(stepId, state) {
+  const el = document.getElementById(stepId);
+  if (!el) return;
+  el.classList.remove('done','active','pending');
+  el.classList.add(state);
+  const idx = steps.indexOf(stepId);
+  if (state === 'done' && idx > 0) {
+    const arrow = document.getElementById(arrows[idx-1]);
+    if (arrow) { arrow.classList.remove('pending'); arrow.classList.add('done'); }
+  }
+}
+
+// ══ ACTIONS ══
+function proceedToPreprocess() {
+  showNav(document.querySelectorAll('nav button')[1], 'page-preprocess');
+  log('Moved to preprocessing stage');
+}
+
+function previewPreprocess() {
+  log('Preprocessing preview — stub: call backend /preprocess endpoint', 'warn');
+  setPipelineStep('ps-pre', 'active');
+  setTimeout(() => {
+    const orig = document.getElementById('pre-orig');
+    const img = orig.querySelector('img');
+    if (img) {
+      document.getElementById('pre-result').innerHTML = `<img src="${img.src}" style="filter:grayscale(1) contrast(1.4);" alt="preprocessed"/>`;
+      log('Preprocessing preview complete (CSS filter mock)', 'ok');
+      setPipelineStep('ps-pre', 'done');
+    } else {
+      log('No image loaded — upload an image first', 'err');
+    }
+  }, 600);
+}
+
+function applyPreprocess() {
+  previewPreprocess();
+  setTimeout(() => {
+    log('Preprocessing applied', 'ok');
+    showNav(document.querySelectorAll('nav button')[2], 'page-segment');
+  }, 800);
+}
+
+async function runSegmentation() {
+  if (!currentFile) {
+    log('No image loaded — upload an image first', 'err');
+    return;
+  }
+
+  log('Running segmentation — calling /segment endpoint…', 'info');
+  setPipelineStep('ps-seg', 'active');
+
+  const useAdaptive = !document.getElementById('tgl-adapt').classList.contains('on') ? 'false' : 'true';
+  const minArea     = 200; // TODO: expose as UI slider if desired
+
+  const formData = new FormData();
+  formData.append('file', currentFile);
+  formData.append('use_adaptive', useAdaptive);
+  formData.append('min_component_area', minArea);
+
+  try {
+    const resp = await fetch('/segment', { method: 'POST', body: formData });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      log('Segmentation error: ' + err.detail, 'err');
+      setPipelineStep('ps-seg', 'pending');
+      return;
+    }
+
+    const data = await resp.json();
+
+    // ── show annotated image (bounding boxes drawn by backend) ──
+    const segPreview = document.getElementById('seg-preview');
+    segPreview.innerHTML = `<img src="data:image/png;base64,${data.annotated_b64}" style="max-width:100%;max-height:300px;" alt="segmented"/>`;
+
+    // ── show binary image in right panel ──
+    document.getElementById('rp-preview').innerHTML = `<img src="data:image/png;base64,${data.binary_b64}" style="max-width:100%;max-height:140px;" alt="binary"/>`;
+
+    // ── populate digit crops ──
+    const results = document.getElementById('seg-results');
+    results.innerHTML = '';
+    if (data.digit_crops_b64.length === 0) {
+      results.innerHTML = '<div style="color:var(--muted);font-size:12px;">No digits found — try adjusting min area or threshold mode.</div>';
+    } else {
+      data.digit_crops_b64.forEach((b64, i) => {
+        results.innerHTML += `
+          <div class="seg-box">
+            <img src="data:image/png;base64,${b64}" style="width:36px;height:36px;image-rendering:pixelated;" alt="digit ${i}"/>
+            <div class="seg-label">D${i+1}</div>
+            <div class="seg-conf">${data.bounding_boxes[i].w}×${data.bounding_boxes[i].h}px</div>
+          </div>`;
+      });
+    }
+
+    // ── store crops for Task 3 predict calls ──
+    window.segmentedCrops = data.digit_crops_b64;
+    window.boundingBoxes  = data.bounding_boxes;
+
+    setPipelineStep('ps-seg', 'done');
+    log(`Segmentation complete — ${data.digit_count} digit(s) detected`, 'ok');
+
+  } catch (e) {
+    log('Network error: ' + e.message, 'err');
+    setPipelineStep('ps-seg', 'pending');
+  }
+}
+
+// ══ MODEL SELECT ══
+function selectModel(card, name, desc, framework, acc, note) {
+  document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  document.getElementById('sidebar-model-name').textContent = name;
+  document.getElementById('sidebar-model-desc').textContent = desc;
+  document.getElementById('sidebar-model-tags').innerHTML = `<span class="badge badge-green">Ready</span><span class="badge badge-purple">${acc}</span>`;
+  log('Model selected: ' + name, 'info');
+}
+
+// ══ TRAINING MOCK ══
+function startTraining() {
+  const epochs = parseInt(document.getElementById('epoch-val').textContent);
+  log('Training started — stub: call model.fit() on MNIST', 'info');
+  setPipelineStep('ps-ml', 'active');
+  document.getElementById('train-status').textContent = 'Training…';
+  let ep = 0;
+  const iv = setInterval(() => {
+    ep++;
+    const pct = Math.round(ep/epochs*100);
+    document.getElementById('epoch-bar').style.width = pct+'%';
+    document.getElementById('epoch-progress-label').textContent = ep+'/'+epochs;
+    const acc = (0.97 + (ep/epochs)*0.02).toFixed(4);
+    const loss = (0.12 - (ep/epochs)*0.09).toFixed(4);
+    document.getElementById('m-acc').textContent = (parseFloat(acc)*100).toFixed(1)+'%';
+    document.getElementById('m-loss').textContent = loss;
+    document.getElementById('m-time').textContent = (ep*3)+'s';
+    document.getElementById('m-eta').textContent = ((epochs-ep)*3)+'s';
+    if (ep >= epochs) {
+      clearInterval(iv);
+      document.getElementById('train-status').textContent = 'Training complete ✓';
+      setPipelineStep('ps-ml', 'done');
+      log('Model training complete — stub: save weights to disk', 'ok');
+    }
+  }, 300);
+}
+
+// ══ RECOGNITION MOCK ══
+function runRecognition() {
+  log('Running recognition — stub: model.predict() on segmented tensors', 'warn');
+  setPipelineStep('ps-out', 'active');
+  setTimeout(() => {
+    const num = Math.floor(Math.random()*900+100).toString();
+    document.getElementById('result-number').textContent = num;
+    document.getElementById('result-meta').textContent = `Model: CNN (LeNet-5) · ${num.length} digits · ${Math.floor(Math.random()*8+4)}ms`;
+    document.getElementById('r-digits').textContent = num.length;
+    document.getElementById('r-avgconf').textContent = (Math.random()*8+91).toFixed(1)+'%';
+    document.getElementById('r-time').textContent = Math.floor(Math.random()*8+4)+'ms';
+
+    // Confidence bars for each digit
+    const bars = document.getElementById('conf-bars');
+    bars.innerHTML = '';
+    [...num].forEach((d,i) => {
+      const conf = (Math.random()*8+91).toFixed(1);
+      bars.innerHTML += `<div class="conf-item"><span class="conf-digit" style="color:var(--text); font-weight:500;">${d}</span><div style="flex:1;"><div class="conf-bar-wrap"><div class="conf-bar" style="width:${conf}%"></div></div></div><span class="conf-pct">${conf}%</span></div>`;
+    });
+
+    // Segments
+    const segs = document.getElementById('result-segments');
+    segs.innerHTML = '';
+    [...num].forEach((d,i) => {
+      const conf = (Math.random()*8+91).toFixed(1);
+      segs.innerHTML += `<div class="seg-box"><div style="width:44px;height:44px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:22px;font-weight:800;color:var(--text)">${d}</div><div class="seg-label">${d}</div><div class="seg-conf">${conf}%</div></div>`;
+    });
+
+    setPipelineStep('ps-out', 'done');
+    log('Recognition complete: ' + num, 'ok');
+  }, 700);
+}
+
+// ══ EVALUATION ══
+function runEvaluation() {
+  log('Running evaluation on MNIST test set — stub', 'warn');
+  setTimeout(() => {
+    document.getElementById('ev-acc').textContent = '99.1%';
+    document.getElementById('ev-prec').textContent = '99.0%';
+    document.getElementById('ev-rec').textContent = '99.1%';
+    document.getElementById('ev-f1').textContent = '99.1%';
+    buildConfusionMatrix();
+    log('Evaluation complete (demo values)', 'ok');
+  }, 1000);
+}
+
+function buildConfusionMatrix() {
+  const grid = document.getElementById('conf-matrix');
+  grid.innerHTML = '';
+  for (let r=0; r<10; r++) {
+    for (let c=0; c<10; c++) {
+      const isD = r===c;
+      const v = isD ? Math.floor(Math.random()*50+940) : Math.floor(Math.random()*6);
+      const alpha = isD ? 0.85 : Math.min(v/30, 0.5);
+      const cell = document.createElement('div');
+      cell.className = 'cm-cell';
+      cell.style.background = isD
+        ? `rgba(62,207,178,${alpha})`
+        : `rgba(255,107,107,${alpha+0.05})`;
+      cell.title = `True:${r} Pred:${c} → ${v}`;
+      grid.appendChild(cell);
+    }
+  }
+}
+
+// ══ FULL PIPELINE ══
+function runFullPipeline() {
+  log('Starting full pipeline run…', 'info');
+  previewPreprocess();
+  setTimeout(() => runSegmentation(), 1200);
+  setTimeout(() => runRecognition(), 2400);
+}
+
+function resetAll() {
+  ['ps-pre','ps-seg','ps-ml','ps-out'].forEach(id => setPipelineStep(id, 'pending'));
+  ['pa-1','pa-2','pa-3','pa-4'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.classList.remove('done'); el.classList.add('pending'); }
+  });
+  ['upload-preview','rp-preview','pre-orig','pre-result'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<div class="preview-empty">${id==='upload-preview'?'No image loaded yet':'–'}</div>`;
+  });
+  document.getElementById('result-number').textContent = '—';
+  document.getElementById('sys-log').innerHTML = '<div class="log-line info">[HNRS] System reset</div>';
+  log('All state cleared', 'ok');
+}
+
+// ══ TOGGLES ══
+function toggleEl(el, feature) {
+  el.classList.toggle('on');
+  const state = el.classList.contains('on') ? 'ON' : 'OFF';
+  log(`Preprocessing: ${feature} → ${state}`);
+}
+
+// ══ SEG DESC ══
+const segDescs = {
+  'Connected Component Labeling': 'Finds groups of connected foreground pixels and draws bounding boxes. Robust for clearly separated digits.',
+  'Contour Detection (OpenCV)': 'Uses cv2.findContours() to trace outer edges of digit blobs. Works well on binarized images.',
+  'Vertical Projection Profile': 'Projects pixel sums vertically to find valleys between digits. Fast, works on well-aligned text.',
+  'Sliding Window': 'Scans image with a fixed-size window; requires a classifier to detect digit presence. Good for dense scripts.',
+  'MSER (Maximally Stable Extremal Regions)': 'Detects stable intensity regions at multiple thresholds. Tolerant to lighting variation.',
+};
+function updateSegDesc() {
+  const sel = document.getElementById('seg-algo').value;
+  document.getElementById('seg-desc').textContent = segDescs[sel] || '';
+}
+
+// Init confusion matrix placeholder
+buildConfusionMatrix();
+</script>
+</body>
+</html>

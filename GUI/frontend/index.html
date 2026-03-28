@@ -334,7 +334,7 @@
 
     <div class="stub-notice">
       <span class="stub-icon">⚙️</span>
-      Stub — implement contour detection (OpenCV findContours), connected component labeling, or projection profiles.
+      Stub — Implement Connected Component Analysis only
     </div>
 
     <div class="grid-2" style="gap:20px;">
@@ -343,11 +343,7 @@
         <div class="field-group">
           <label class="field-label">Algorithm</label>
           <select id="seg-algo" onchange="updateSegDesc()">
-            <option>Connected Component Labeling</option>
-            <option>Contour Detection (OpenCV)</option>
-            <option>Vertical Projection Profile</option>
-            <option>Sliding Window</option>
-            <option>MSER (Maximally Stable Extremal Regions)</option>
+            <option>Connected Component Analysis</option>
           </select>
         </div>
         <div id="seg-desc" style="font-size: 12px; color: var(--muted); line-height:1.7; background: var(--surface2); border-radius: 6px; padding: 10px; margin-top: 8px;">
@@ -1122,11 +1118,7 @@ function toggleEl(el, feature) {
 
 // ══ SEG DESC ══
 const segDescs = {
-  'Connected Component Labeling': 'Finds groups of connected foreground pixels and draws bounding boxes. Robust for clearly separated digits.',
-  'Contour Detection (OpenCV)': 'Uses cv2.findContours() to trace outer edges of digit blobs. Works well on binarized images.',
-  'Vertical Projection Profile': 'Projects pixel sums vertically to find valleys between digits. Fast, works on well-aligned text.',
-  'Sliding Window': 'Scans image with a fixed-size window; requires a classifier to detect digit presence. Good for dense scripts.',
-  'MSER (Maximally Stable Extremal Regions)': 'Detects stable intensity regions at multiple thresholds. Tolerant to lighting variation.',
+  'Connected Component Analysis': 'Finds groups of connected foreground pixels and draws bounding boxes. Robust for clearly separated digits.'
 };
 function updateSegDesc() {
   const sel = document.getElementById('seg-algo').value;

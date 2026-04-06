@@ -37,3 +37,26 @@ EPOCHS = {
 # ── MNIST normalization stats ─────────────────────────────
 MNIST_MEAN = (0.1307,)
 MNIST_STD  = (0.3081,)
+
+
+# ── Task 1 preprocessing parameters ──────────────────────
+PREPROCESSING = {
+    "target_size": 28,
+    "min_mean_saturation": 18,
+    "ink_saturation_threshold": 55,
+    "ink_value_threshold": 40,
+    "clahe_clip_limit": 2.0,
+    "clahe_tile_grid": (8, 8),
+    "faint_pencil_adaptive": {
+        "block_size": 31,
+        "c": 4,
+    },
+    "line_detection": {
+        "horizontal_min_width": 60,
+        "vertical_min_height": 60,
+    },
+    "crop_padding": {
+        "color": 15,
+        "grayscale": 10,
+    },
+}

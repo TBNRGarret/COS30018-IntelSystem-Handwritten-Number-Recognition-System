@@ -14,10 +14,10 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ── Link to Task 1 ─────────────────────────────────────────────────
+# ── Link to Task 1 ─────────────────────────────────────────
 from task1_preprocessing import preprocess, smart_resize
 
-# ── Filtering constants──
+# ── Filtering constants──────────────────────────────────────
 ASPECT_RATIO_MIN   = 0.15   
 ASPECT_RATIO_MAX   = 6.0   
 FILL_RATIO_MAX     = 0.92   
@@ -211,7 +211,7 @@ def _sort_reading_order(digits: list, row_tolerance: float = 0.55) -> list:
 
 
 # ══════════════════════════════════════════════════════════
-# Main segmentation function
+# Main segmentation function-CCA
 # ══════════════════════════════════════════════════════════
 
 def segment_digits(binary_image: np.ndarray, debug: bool = False) -> list[tuple]:
@@ -219,8 +219,6 @@ def segment_digits(binary_image: np.ndarray, debug: bool = False) -> list[tuple]
     Run CCA on binary_image and return a list of
     (mnist_patch, x, y, w, h) tuples sorted in reading order.
 
-    All size thresholds are computed relative to the image resolution
-    so the function works on any image size (phone photo or small scan).
     """
     img_h, img_w = binary_image.shape
     img_area     = img_h * img_w
@@ -231,7 +229,7 @@ def segment_digits(binary_image: np.ndarray, debug: bool = False) -> list[tuple]
     max_digit_w = max(60,   int(img_w * MAX_DIGIT_W_RATIO))
     edge_margin = max(3,    min(15,   int(min(img_h, img_w) * 0.008)))
 
-    # ── Stroke thickening (for detection only) ────────────────────────
+    # ── Stroke thickening────────────────────────
     dk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     detect_binary = cv2.dilate(binary_image, dk, iterations=1)
 
@@ -257,7 +255,7 @@ def segment_digits(binary_image: np.ndarray, debug: bool = False) -> list[tuple]
         if h < min_h or w < min_w:
             continue
 
-        # 3 ── Aspect ratio (exclude horizontal lines → ratio < 0.15) ─
+        # 3 ── Aspect ratio───────────────────────────────────────────
         ratio = h / w
         if ratio < ASPECT_RATIO_MIN or ratio > ASPECT_RATIO_MAX:
             continue
